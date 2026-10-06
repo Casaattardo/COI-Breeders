@@ -1,3 +1,7 @@
+(function(){
+ const original=window.runCOITests;
+ window.enableDiagnostics=function(){const b=document.getElementById('runDiagnosticsBtn');if(b){b.style.display='inline-flex';b.onclick=()=>{if(typeof original==='function')original();};}};
+})();
 function runCOITests(){
  const c=[], n=(s=null,d=null)=>({sire:s,dam:d});
  const add=(name,expected,a,b,nodes)=>{const actual=window.COIEngine.offspringInbreeding(a,b,nodes);c.push({name,expected,actual,ok:Math.abs(actual-expected)<1e-9});};
