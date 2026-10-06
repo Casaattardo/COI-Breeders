@@ -109,4 +109,16 @@ if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch((
 let aiImageData='',aiExtracted={};
 function previewPedigree(e){const f=e.target.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{aiImageData=rd.result;document.getElementById('pedImage').src=aiImageData;document.getElementById('aiStatus').textContent='Foto caricata. Premi “AI Analizza” per avviare l’estrazione.'};rd.readAsDataURL(f)}
 function runPedigreeAI(){if(!aiImageData){alert('Carica prima una foto del pedigree.');return}document.getElementById('aiStatus').textContent='Modalità demo: il collegamento sicuro al servizio AI sarà configurato nella V3.1.';document.getElementById('aiFields').innerHTML='<div class="check warn">⚠️ Nessuna estrazione automatica è stata eseguita: manca il servizio AI configurato. Questo evita di inventare nomi genealogici.</div><p class="hint">La schermata è già pronta para receber o resultado estruturado da IA. A chave API deve ficar no backend, nunca no browser.</p>';}
-function applyAIResult(){if(!aiExtracted||!Object.keys(aiExtracted).length){alert('Non ci sono dati AI verificati da applicare.');return}showView('new')}
+function applyAIResult(){
+ if(!window.aiExtracted||!Object.keys(window.aiExtracted).length){alert('Non ci sono dati AI verificati da applicare.');return}
+ const x=window.aiExtracted;
+ const sire=document.getElementById('sireName'),dam=document.getElementById('damName');
+ if(sire)sire.value=x.parents?.sire||'';
+ if(dam)dam.value=x.parents?.dam||'';
+ const byGen={};
+ (x.ancestors||[]).forEach(v=>{if(v.name)byGen[(v.side||'')+v.generation+'_'+(v.position-1)]=v.name});
+ Object.entries(byGen).forEach(([k,v])=>{const el=document.querySelector('[data-node="'+k+'"]');if(el)el.value=v});
+ window.aiPedigreeConfirmed=true;
+ showView('new');
+ const note=document.getElementById('aiStatus');if(note)note.textContent='✓ Pedigree verificato e applicato. Controlla i dati prima del calcolo COI.';
+}
