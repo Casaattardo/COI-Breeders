@@ -1,0 +1,1 @@
+window.SUPABASE_CONFIG={url:"https://qkercahbjtwlfiwqfvxy.supabase.co",publishableKey:"sb_publishable_djxFBy2l2LQg0RiFg_5RcQ_h8NkzUnh"};
