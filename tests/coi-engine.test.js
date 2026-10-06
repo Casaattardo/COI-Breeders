@@ -1,6 +1,9 @@
 const assert=require('node:assert/strict');
 
-function kin(a,b,nodes,memo={},stack=new Set()){
+const {kin}=require('../coi-engine.js');
+
+/* Shared production engine is tested below. */
+function legacyKin(a,b,nodes,memo={},stack=new Set()){
   if(!a||!b||!nodes[a]||!nodes[b]) return 0;
   const k=a<b?a+'|'+b:b+'|'+a;
   if(memo[k]!==undefined) return memo[k];
