@@ -20,6 +20,8 @@ window.runPedigreeAI=async function(){
 function renderAI(x){
  const box=document.getElementById("aiFields"),status=document.getElementById("aiStatus");
  status.textContent="Estrazione completata: verifica attentamente ogni nome prima di applicare il pedigree.";
+ const low=(x.ancestors||[]).filter(v=>(v.confidence||0)<0.8).length;
+ if(low) status.textContent+=" ⚠️ "+low+" dati hanno confidenza inferiore all'80%.";
  const a=(x.ancestors||[]).map((v,i)=>"<div class='ai-row'><label>"+esc(v.side)+" · G"+v.generation+" · posizione "+v.position+"<input data-ai-index='"+i+"' value='"+esc(v.name)+"'></label><small>Confidenza: "+Math.round((v.confidence||0)*100)+"%</small></div>").join("");
  box.innerHTML="<div class='check warn'>⚠️ L’AI non è una certificazione: confronta sempre i dati con la foto originale.</div><label>Nome soggetto<input id='aiSubject' value='"+esc(x.subject?.name||"")+"'></label><label>Padre<input id='aiSire' value='"+esc(x.parents?.sire||"")+"'></label><label>Madre<input id='aiDam' value='"+esc(x.parents?.dam||"")+"'></label><div class='gen-title'>ANTENATI ESTRATTI</div>"+(a||"<div class='empty'>Nessun antenato riconosciuto.</div>")+"<button id='confirmAI' style='margin-top:15px'>Conferma dati verificati</button>";
  document.getElementById("confirmAI").onclick=confirmAI;
