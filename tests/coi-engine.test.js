@@ -50,17 +50,19 @@ check('First cousins',0.0625,'C1','C2',{
  X:node(),Y:node(),C1:node('P1','X'),C2:node('P2','Y')
 });
 
-// 7) double first cousins: kin=0.125
+// 7) double first cousins: two sibling parent pairs sharing two grandparents.
+// Kinship is 1/8.
 check('Double first cousins',0.125,'C1','C2',{
- G:node(),H:node(),P1:node('G','H'),P2:node('G','H'),
- C1:node('P1','P2'), C2:node('P1','P2')
+ G1:node(),G2:node(),P1:node('G1','G2'),P2:node('G1','G2'),
+ U1:node(),U2:node(),C1:node('P1','U1'),C2:node('P2','U2')
 });
 
-// 8) inbred common ancestor: common ancestor A is itself inbred through P/Q
-// kin(P,Q)=0.25 -> F_A=0.0? Here P and Q are parent/offspring, so A has F=0.25.
-// X and Y are both children of A through unrelated mates: kin(X,Y)=0.125.
-check('Offspring of an inbred ancestor',0.125,'X','Y',{
- P:node(),Q:node(),A:node('P','Q'),M:node(),N:node(),X:node('A','M'),Y:node('A','N')
+// 8) an inbred common ancestor.
+// A is offspring of a parent and its own offspring, so F_A=25%.
+// X and Y each descend once from A; contribution is 0.25*(1+0.25)=31.25%.
+check('Offspring sharing an inbred ancestor',0.3125,'X','Y',{
+ P:node(),Q:node('P','R'),R:node(),A:node('P','Q'),
+ M:node(),N:node(),X:node('A','M'),Y:node('A','N')
 });
 
 console.log('\nAll COI regression tests passed.');
