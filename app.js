@@ -16,35 +16,89 @@ function renderPedigreeInputs(){
 function updateCount(){const all=document.querySelectorAll('[data-node]');let filled=0;all.forEach(x=>{if(x.value.trim())filled++});const el=document.getElementById('filled');if(el)el.textContent=filled+' / '+all.length+' posizioni';}
 document.addEventListener('input',e=>{if(e.target.matches('[data-node]'))updateCount()});
 function collect(side){const r={};document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{if(e.value.trim())r[e.dataset.node]=e.value.trim()});return r}
+function canonicalKey(name){
+ const n=norm(name);
+ const matches=state.dogs.filter(d=>norm(d.name||'')===n);
+ if(matches.length===1)return 'dog:'+matches[0].id;
+ return 'name:'+n;
+}
 function buildRoot(root,side,depth=5){
- const raw=collect(side),nodes={};const rid=norm(root);nodes[rid]={name:root,sire:null,dam:null,gen:0};
- for(let g=0;g<depth;g++)for(let i=0;i<2**(g+1);i++){
-  const v=raw[side+g+'_'+i];if(!v)continue;const id=norm(v);
-  if(!nodes[id])nodes[id]={name:v,sire:null,dam:null,gen:g+1};
-  const parentIndex=Math.floor(i/2);
-  if(g===0)nodes[rid][i===0?'sire':'dam']=id;
-  else{const childKey=side+(g-1)+'_'+parentIndex;const child=raw[side+(g-1)+'_'+parentIndex];if(child){const cid=norm(child);if(nodes[cid])nodes[cid][i%2===0?'sire':'dam']=id;}}
+ const raw=collect(side),nodes={};
+ const rid=canonicalKey(root);
+ nodes[rid]={id:rid,name:root,sire:null,dam:null,gen:0,source:side};
+ for(let g=0;g<depth;g++){
+  for(let i=0;i<2**(g+1);i++){
+   const v=raw[side+g+'_'+i]; if(!v)continue;
+   const id=canonicalKey(v);
+   if(!nodes[id])nodes[id]={id,name:v,sire:null,dam:null,gen:g+1,source:side};
+   const parentIndex=Math.floor(i/2);
+   if(g===0) nodes[rid][i===0?'sire':'dam']=id;
+   else{
+    const childVal=raw[side+(g-1)+'_'+parentIndex];
+    if(childVal){
+      const cid=canonicalKey(childVal);
+      if(nodes[cid]) nodes[cid][i%2===0?'sire':'dam']=id;
+    }
+   }
+  }
  }
  return nodes;
 }
-function merge(a,b){const o={};for(const [id,n] of Object.entries(a))o[id]={...n};for(const [id,n] of Object.entries(b))o[id]=o[id]?{...o[id],...n}:{...n};return o}
+function merge(a,b){
+ const o={}; const conflicts=[];
+ for(const [id,n] of Object.entries(a))o[id]={...n};
+ for(const [id,n] of Object.entries(b)){
+  if(!o[id])o[id]={...n};
+  else{
+   const old=o[id];
+   o[id]={...old,name:old.name||n.name,sire:old.sire||n.sire,dam:old.dam||n.dam,gen:Math.min(old.gen??99,n.gen??99),sources:[...(old.sources||[old.source]),n.source]};
+   if(old.sire&&n.sire&&old.sire!==n.sire)conflicts.push(id);
+   if(old.dam&&n.dam&&old.dam!==n.dam)conflicts.push(id);
+  }
+ }
+ return {nodes:o,conflicts:[...new Set(conflicts)]};
+}
 function kin(a,b,nodes,memo,stack){
  if(!a||!b||!nodes[a]||!nodes[b])return 0;
- const k=a<b?a+'|'+b:b+'|'+a;if(memo[k]!=null)return memo[k];stack=stack||new Set();if(stack.has(k))return 0;
+ const k=a<b?a+'|'+b:b+'|'+a;
+ if(memo[k]!==undefined)return memo[k];
+ stack=stack||new Set();
+ if(stack.has(k))return 0;
  const ns=new Set(stack);ns.add(k);
- if(a===b){const p=nodes[a];if(!p.sire&&!p.dam)return memo[k]=0.5;return memo[k]=(1+kin(p.sire,p.dam,nodes,memo,ns))/2}
- const x=nodes[a];return memo[k]=0.5*(kin(x.sire,b,nodes,memo,ns)+kin(x.dam,b,nodes,memo,ns));
+ if(a===b){
+   const p=nodes[a];
+   if(!p.sire&&!p.dam)return memo[k]=0.5;
+   if(!p.sire||!p.dam)return memo[k]=0.5;
+   return memo[k]=(1+kin(p.sire,p.dam,nodes,memo,ns))/2;
+ }
+ const x=nodes[a];
+ return memo[k]=0.5*(kin(x.sire,b,nodes,memo,ns)+kin(x.dam,b,nodes,memo,ns));
 }
-function inbreed(id,nodes,memo){const n=nodes[id];return n&&n.sire&&n.dam?kin(n.sire,n.dam,nodes,memo,new Set()):0}
-function ancestorMap(side){const m={};document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{const v=e.value.trim();if(!v)return;const q=e.dataset.node.match(/^[sd](\d+)_/);const d=+q[1]+1;const id=norm(v);m[id]=m[id]?Math.min(m[id],d):d});return m}
+function inbreed(id,nodes,memo){return kin(id,id,nodes,memo,new Set())*1-0.5}
+function ancestorMap(side){
+ const m={};
+ document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{
+   const v=e.value.trim();if(!v)return;
+   const q=e.dataset.node.match(/^[sd](\\d+)_/);const d=+q[1]+1;
+   const id=canonicalKey(v);
+   if(!m[id]||d<m[id])m[id]=d;
+ });
+ return m;
+}
 function calculate(){
  const sire=document.getElementById('sireName').value.trim(),dam=document.getElementById('damName').value.trim();
  if(!sire||!dam){alert('Inserisci il nome del padre e della madre.');return}
- const A=buildRoot(sire,'s'),B=buildRoot(dam,'d'),nodes=merge(A,B),memo={},F=kin(norm(sire),norm(dam),nodes,memo,new Set());
- const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]);
- const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:inbreed(id,nodes,memo)})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
+ const A=buildRoot(sire,'s'),B=buildRoot(dam,'d'),merged=merge(A,B),nodes=merged.nodes,memo={};
+ const sireId=canonicalKey(sire),damId=canonicalKey(dam);
+ const F=Math.max(0,kin(sireId,damId,nodes,memo,new Set()));
+ const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]&&x!==sireId&&x!==damId);
+ const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
- const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions};
+ const warnings=[];
+ if(merged.conflicts.length)warnings.push('Sono stati rilevati antenati con genitori discordanti tra i due pedigree: verifica i dati.');
+ const duplicateNames=state.dogs.filter((d,i)=>state.dogs.some((x,j)=>j!==i&&norm(x.name||'')===norm(d.name||'')));
+ if(duplicateNames.length)warnings.push('Esistono omonimie nell’archivio: gli individui non identificati tramite ID sono stati confrontati per nome.');
+ const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
 }
 function renderResult(r,filled){
