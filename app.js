@@ -58,23 +58,8 @@ function merge(a,b){
  }
  return {nodes:o,conflicts:[...new Set(conflicts)]};
 }
-function kin(a,b,nodes,memo,stack){
- if(!a||!b||!nodes[a]||!nodes[b])return 0;
- const k=a<b?a+'|'+b:b+'|'+a;
- if(memo[k]!==undefined)return memo[k];
- stack=stack||new Set();
- if(stack.has(k))return 0;
- const ns=new Set(stack);ns.add(k);
- if(a===b){
-   const p=nodes[a];
-   if(!p.sire&&!p.dam)return memo[k]=0.5;
-   if(!p.sire||!p.dam)return memo[k]=0.5;
-   return memo[k]=(1+kin(p.sire,p.dam,nodes,memo,ns))/2;
- }
- const x=nodes[a];
- return memo[k]=0.5*(kin(x.sire,b,nodes,memo,ns)+kin(x.dam,b,nodes,memo,ns));
-}
-function inbreed(id,nodes,memo){return kin(id,id,nodes,memo,new Set())*1-0.5}
+function kin(a,b,nodes,memo,stack){return window.COIEngine.kin(a,b,nodes,memo,stack)}
+function inbreed(id,nodes,memo){return window.COIEngine.ancestorInbreeding(id,nodes)}
 function ancestorMap(side){
  const m={};
  document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{
