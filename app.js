@@ -104,6 +104,7 @@ function calculate(){
 function renderResult(r,filled){
  const pct=(r.coi*100).toFixed(3)+'%';document.getElementById('resultTitle').textContent=r.name;document.getElementById('coiValue').textContent=pct;document.getElementById('dashCoi').textContent=pct;document.getElementById('commonCount').textContent=r.common.length;
  document.getElementById('coiNote').textContent=r.complete?'Pedigree completo a 5 generazioni.':'Calcolo sui dati disponibili: pedigree incompleto.';
+ if(r.warnings?.length)document.getElementById('coiNote').textContent+=' '+r.warnings.join(' ');
  document.getElementById('ancestors').innerHTML=r.common.length?r.common.map(a=>'<div class="ancestor"><b>'+esc(a.name)+'</b><span>G'+a.n1+' / G'+a.n2+'</span></div>').join(''):'<div class="empty">Nessun antenato comune rilevato.</div>';
  const checks=document.getElementById('checks');if(checks)checks.innerHTML='<div class="check '+(r.complete?'ok':'warn')+'">'+(r.complete?'✓ Pedigree completo.':'⚠ Pedigree incompleto: '+(124-filled)+' posizioni vuote.')+'</div><div class="check ok">✓ Individui confrontati per nome normalizzato.</div><div class="check ok">✓ COI ottenuto come parentela padre–madre con ricorsione genealogica.</div>';
  const d=document.getElementById('calculationDetails');if(d)d.innerHTML=r.common.map(a=>'<div class="formula">'+esc(a.name)+': n₁='+a.n1+', n₂='+a.n2+', Fₐ='+(a.fa*100).toFixed(3)+'%</div>').join('')||'<div class="empty">Nessun contributo da antenati comuni.</div>';
