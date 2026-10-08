@@ -10,12 +10,12 @@ window.runPedigreeAI=async function(){
  if(!file){alert("Carica prima una foto del pedigree.");busy=false;return;}
  try{
   status("Analisi del pedigree con riconoscimento immagini…");
-  const session=window.supabaseClient?await window.supabaseClient.auth.getSession():null;
+  const session=window.COI_SUPABASE?await window.COI_SUPABASE.auth.getSession():null;
   const token=session?.data?.session?.access_token;
   if(!token){status("Accedi all'app prima di usare il riconoscimento immagini.","warn");return;}
   const image=await fileData(file);
   const url=window.SUPABASE_CONFIG.url+"/functions/v1/parse-pedigree-gemini";
-  const resp=await fetch(url,{method:"POST",headers:{"Authorization":"Bearer "+token,"apikey":window.SUPABASE_CONFIG.anonKey,"Content-Type":"application/json"},body:JSON.stringify({image_base64:image,mime_type:file.type||"image/jpeg"})});
+  const resp=await fetch(url,{method:"POST",headers:{"Authorization":"Bearer "+token,"apikey":window.SUPABASE_CONFIG.publishableKey,"Content-Type":"application/json"},body:JSON.stringify({image_base64:image,mime_type:file.type||"image/jpeg"})});
   const data=await resp.json();
   if(!resp.ok||data.error)throw new Error(data.error||"Errore del servizio di riconoscimento");
   extracted=data.result;window.aiExtracted=extracted;renderAI(extracted);
