@@ -1,7 +1,7 @@
 (function(){
 let extracted=null,busy=false;
 const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));
-function status(t,k=""){const e=document.getElementById("aiStatus");if(e)e.innerHTML='<div class="check '+k+'">'+esc(t)+'</div>';}
+function status(t,k="",targetId="aiStatus"){const e=document.getElementById(targetId);if(e)e.innerHTML='<div class="check '+k+'">'+esc(t)+'</div>';}
 function fileData(file){return new Promise((ok,bad)=>{const r=new FileReader();r.onload=()=>ok(String(r.result));r.onerror=bad;r.readAsDataURL(file);});}
 
 window.runArchivePedigreeAI=async function(){window.aiMode="archive";return window.runPedigreeAI()};
@@ -27,16 +27,18 @@ window.runPedigreeAI=async function(){
 
 function renderAI(x,archiveMode=false){
  const box=document.getElementById(archiveMode?"dogAiFields":"aiFields");
- const rows=(x.ancestors||[]).map((v,i)=>'<div class="ai-row"><label>'+esc(v.side==="sire"?"PADRE":"MADRE")+' · G'+v.generation+' · posizione '+v.position+'<input data-ai-index="'+i+'" value="'+esc(v.name||"")+'"></label><small>Confidenza: '+Math.round((v.confidence||0)*100)+'%</small></div>').join("");
- box.innerHTML='<div class="check ok">✓ Riconoscimento immagini completato. Verifica i dati sulla foto originale.</div><label>Nome soggetto<input id="aiSubject" value="'+esc(x.subject?.name||"")+'"></label><label>Padre<input id="aiSire" value="'+esc(x.parents?.sire||"")+'"></label><label>Madre<input id="aiDam" value="'+esc(x.parents?.dam||"")+'"></label><div class="gen-title">ANTENATI RICONOSCIUTI</div>'+(rows||'<div class="empty">Nessun antenato riconosciuto.</div>')+'<div class="ocr-raw"><details><summary>Avvertenze</summary><pre>'+esc((x.warnings||[]).join("\n"))+'</pre></details></div><button id="confirmAI" style="margin-top:15px">Conferma dati verificati</button>';
+ const rows=(x.ancestors||[]).map((v,i)=>'<div class="ai-row"><label>'+esc(v.side==="sire"?"PADRE":"MADRE")+' · G'+v.generation+' · posizione '+v.position+'<input data-ai-mode="'+(archiveMode?"archive":"litter")+'" data-ai-index="'+i+'" value="'+esc(v.name||"")+'"></label><small>Confidenza: '+Math.round((v.confidence||0)*100)+'%</small></div>').join("");
+ const suffix=archiveMode?"Archive":"Litter";
+ box.innerHTML='<div class="check ok">✓ Riconoscimento immagini completato. Verifica i dati sulla foto originale.</div><label>Nome soggetto<input id="aiSubject'+suffix+'" value="'+esc(x.subject?.name||"")+'"></label><label>Padre<input id="aiSire'+suffix+'" value="'+esc(x.parents?.sire||"")+'"></label><label>Madre<input id="aiDam'+suffix+'" value="'+esc(x.parents?.dam||"")+'"></label><div class="gen-title">ANTENATI RICONOSCIUTI</div>'+(rows||'<div class="empty">Nessun antenato riconosciuto.</div>')+'<div class="ocr-raw"><details><summary>Avvertenze</summary><pre>'+esc((x.warnings||[]).join("\n"))+'</pre></details></div><button id="confirmAI" style="margin-top:15px">Conferma dati verificati</button>';
  document.getElementById("confirmAI").onclick=()=>confirmAI(archiveMode);
- status("✓ Analisi completata. Controlla i nomi prima di applicarli.");
+ status("✓ Analisi completata. Controlla i nomi prima di applicarli.","",archiveMode?"dogAiStatus":"aiStatus");
 }
 function confirmAI(archiveMode=false){
- [...document.querySelectorAll("[data-ai-index]")].forEach(e=>{if(extracted.ancestors[+e.dataset.aiIndex])extracted.ancestors[+e.dataset.aiIndex].name=e.value.trim();});
- extracted.parents.sire=document.getElementById("aiSire").value.trim();
- extracted.parents.dam=document.getElementById("aiDam").value.trim();
- extracted.subject.name=document.getElementById("aiSubject").value.trim();
+ const mode=archiveMode?"archive":"litter",suffix=archiveMode?"Archive":"Litter";
+ [...document.querySelectorAll('[data-ai-mode="'+mode+'"][data-ai-index]')].forEach(e=>{if(extracted.ancestors[+e.dataset.aiIndex])extracted.ancestors[+e.dataset.aiIndex].name=e.value.trim();});
+ extracted.parents.sire=document.getElementById("aiSire"+suffix).value.trim();
+ extracted.parents.dam=document.getElementById("aiDam"+suffix).value.trim();
+ extracted.subject.name=document.getElementById("aiSubject"+suffix).value.trim();
  window.aiExtracted=extracted;
  if(archiveMode){if(typeof applyArchivePedigree==="function")applyArchivePedigree(extracted);}
  else if(typeof applyAIResult==="function")applyAIResult();
