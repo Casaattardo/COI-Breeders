@@ -14,8 +14,16 @@
    if(!p.sire||!p.dam)return memo[k]=0.5;
    return memo[k]=(1+kin(p.sire,p.dam,nodes,memo,ns))/2;
   }
-  const x=nodes[a];
-  return memo[k]=0.5*(kin(x.sire,b,nodes,memo,ns)+kin(x.dam,b,nodes,memo,ns));
+  const x=nodes[a], y=nodes[b];
+  // Espandi l'individuo che ha genitori noti. Se a è un fondatore,
+  // espandi b: altrimenti le relazioni antenato-discendente risultano 0.
+  if(x.sire||x.dam){
+   return memo[k]=0.5*(kin(x.sire,b,nodes,memo,ns)+kin(x.dam,b,nodes,memo,ns));
+  }
+  if(y.sire||y.dam){
+   return memo[k]=0.5*(kin(a,y.sire,nodes,memo,ns)+kin(a,y.dam,nodes,memo,ns));
+  }
+  return memo[k]=0;
  }
  function offspringInbreeding(sire,dam,nodes){return Math.max(0,kin(sire,dam,nodes,{},new Set()));}
  function ancestorInbreeding(id,nodes){return Math.max(0,kin(id,id,nodes,{},new Set())-0.5);}
