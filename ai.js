@@ -11,7 +11,7 @@ window.runPedigreeAI=async function(){
  const file=document.getElementById(archiveMode?"dogPedPhoto":"pedPhoto")?.files?.[0];
  if(!file){alert("Carica prima una foto del pedigree.");busy=false;return;}
  try{
-  status("Analisi del pedigree con riconoscimento immagini…");
+  status("Analisi del pedigree con riconoscimento immagini…","",archiveMode?"dogAiStatus":"aiStatus");
   const session=window.COI_SUPABASE?await window.COI_SUPABASE.auth.getSession():null;
   const token=session?.data?.session?.access_token;
   if(!token){status("Accedi all'app prima di usare il riconoscimento immagini.","warn");return;}
@@ -30,7 +30,7 @@ function renderAI(x,archiveMode=false){
  const rows=(x.ancestors||[]).map((v,i)=>'<div class="ai-row"><label>'+esc(v.side==="sire"?"PADRE":"MADRE")+' · G'+v.generation+' · posizione '+v.position+'<input data-ai-mode="'+(archiveMode?"archive":"litter")+'" data-ai-index="'+i+'" value="'+esc(v.name||"")+'"></label><small>Confidenza: '+Math.round((v.confidence||0)*100)+'%</small></div>').join("");
  const suffix=archiveMode?"Archive":"Litter";
  box.innerHTML='<div class="check ok">✓ Riconoscimento immagini completato. Verifica i dati sulla foto originale.</div><label>Nome soggetto<input id="aiSubject'+suffix+'" value="'+esc(x.subject?.name||"")+'"></label><label>Padre<input id="aiSire'+suffix+'" value="'+esc(x.parents?.sire||"")+'"></label><label>Madre<input id="aiDam'+suffix+'" value="'+esc(x.parents?.dam||"")+'"></label><div class="gen-title">ANTENATI RICONOSCIUTI</div>'+(rows||'<div class="empty">Nessun antenato riconosciuto.</div>')+'<div class="ocr-raw"><details><summary>Avvertenze</summary><pre>'+esc((x.warnings||[]).join("\n"))+'</pre></details></div><button id="confirmAI" style="margin-top:15px">Conferma dati verificati</button>';
- document.getElementById("confirmAI").onclick=()=>confirmAI(archiveMode);
+ document.getElementById("confirmAI"+suffix).onclick=()=>confirmAI(archiveMode);
  status("✓ Analisi completata. Controlla i nomi prima di applicarli.","",archiveMode?"dogAiStatus":"aiStatus");
 }
 function confirmAI(archiveMode=false){
