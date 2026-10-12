@@ -64,7 +64,7 @@ function ancestorMap(side){
  const m={};
  document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{
    const v=e.value.trim();if(!v)return;
-   const q=e.dataset.node.match(/^[sd](\\d+)_/);const d=+q[1]+1;
+   const q=e.dataset.node.match(/^[sd](\d+)_/);const d=+q[1]+1;
    const id=canonicalKey(v);
    if(!m[id]||d<m[id])m[id]=d;
  });
