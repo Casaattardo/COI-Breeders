@@ -32,18 +32,26 @@ function buildRoot(root,side,depth=5){
  const raw=collect(side),nodes={};
  const rid=canonicalKey(root);
  nodes[rid]={id:rid,name:root,sire:null,dam:null,gen:0,source:side};
+ // Collega ogni antenato alla coppia di genitori in base alla posizione nel pedigree.
+ // Non creare collegamenti quando manca il nome del figlio nel livello precedente.
  for(let g=0;g<depth;g++){
   for(let i=0;i<2**(g+1);i++){
-   const v=raw[side+g+'_'+i]; if(!v)continue;
+   const v=raw[side+g+'_'+i];
+   if(!v)continue;
    const id=canonicalKey(v);
    if(!nodes[id])nodes[id]={id,name:v,sire:null,dam:null,gen:g+1,source:side};
-   const parentIndex=Math.floor(i/2);
-   if(g===0) nodes[rid][i===0?'sire':'dam']=id;
-   else{
+   if(g===0){
+    nodes[rid][i===0?'sire':'dam']=id;
+   }else{
+    const parentIndex=Math.floor(i/2);
     const childVal=raw[side+(g-1)+'_'+parentIndex];
-    if(childVal){
-      const cid=canonicalKey(childVal);
-      if(nodes[cid]) nodes[cid][i%2===0?'sire':'dam']=id;
+    if(!childVal)continue;
+    const cid=canonicalKey(childVal);
+    if(!nodes[cid])nodes[cid]={id:cid,name:childVal,sire:null,dam:null,gen:g,source:side};
+    const field=i%2===0?'sire':'dam';
+    if(!nodes[cid][field])nodes[cid][field]=id;
+    else if(nodes[cid][field]!==id){
+      // Mantieni il primo collegamento e lascia che merge segnali conflitti quando possibile.
     }
    }
   }
@@ -83,6 +91,8 @@ function calculate(){
  const sireId=canonicalKey(sire),damId=canonicalKey(dam);
  const F=Math.max(0,kin(sireId,damId,nodes,memo,new Set()));
  const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]&&x!==sireId&&x!==damId);
+ // Diagnostic indipendente dal calcolo ricorsivo: antenati presenti in entrambi i rami.
+ const commonByTree=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id]}));
  const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
  const warnings=[];
@@ -91,6 +101,7 @@ function calculate(){
  if(duplicateNames.length)warnings.push('Esistono omonimie nell’archivio: gli individui non identificati tramite ID sono stati confrontati per nome.');
  if(F===0&&common.length)warnings.push('Sono stati rilevati antenati comuni nei campi, ma il COI risulta 0: controlla i collegamenti genealogici o eventuali dati incoerenti.');
  if(F===0&&!common.length&&filled>0)warnings.push('Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
+ if(F===0&&commonByTree.length)warnings.push('Diagnostica: i rami contengono antenati con la stessa identità, ma la relazione padre-madre risulta non consanguinea.');
  const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
 }
