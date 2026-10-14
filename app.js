@@ -2,7 +2,12 @@ const KEY='coi-breeders-v2';
 let state=JSON.parse(localStorage.getItem(KEY)||'null')||{dogs:[],litters:[],current:null};
 const save=()=>localStorage.setItem(KEY,JSON.stringify(state));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();
+// Normalizza punteggiatura e numeri di registro riconoscibili, senza unire nomi solo simili.
+const pedigreeIdentity=s=>norm(String(s||''))
+ .replace(/\\b(?:l|ro1|roi|loi)\\s*\\d[\\d/.-]*\\b/g,' ')
+ .replace(/[.,;:()[\\]{}]/g,' ')
+ .replace(/\\s+/g,' ').trim();
 function showView(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='new')renderPedigreeInputs();if(id==='archive')renderArchive();window.scrollTo(0,0)}
 function renderPedigreeInputs(){
  const levels=['Padri','Nonni','Bisnonni','Trisnonni','Quadrisnonni'];
@@ -17,8 +22,8 @@ function updateCount(){const all=document.querySelectorAll('[data-node]');let fi
 document.addEventListener('input',e=>{if(e.target.matches('[data-node]'))updateCount()});
 function collect(side){const r={};document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{if(e.value.trim())r[e.dataset.node]=e.value.trim()});return r}
 function canonicalKey(name){
- const n=norm(name);
- const matches=state.dogs.filter(d=>norm(d.name||'')===n);
+ const n=pedigreeIdentity(name);
+ const matches=state.dogs.filter(d=>pedigreeIdentity(d.name||'')===n);
  if(matches.length===1)return 'dog:'+matches[0].id;
  return 'name:'+n;
 }
@@ -81,8 +86,10 @@ function calculate(){
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
  const warnings=[];
  if(merged.conflicts.length)warnings.push('Sono stati rilevati antenati con genitori discordanti tra i due pedigree: verifica i dati.');
- const duplicateNames=state.dogs.filter((d,i)=>state.dogs.some((x,j)=>j!==i&&norm(x.name||'')===norm(d.name||'')));
+ const duplicateNames=state.dogs.filter((d,i)=>state.dogs.some((x,j)=>j!==i&&pedigreeIdentity(x.name||'')===pedigreeIdentity(d.name||'')));
  if(duplicateNames.length)warnings.push('Esistono omonimie nell’archivio: gli individui non identificati tramite ID sono stati confrontati per nome.');
+ if(F===0&&common.length)warnings.push('Sono stati rilevati antenati comuni nei campi, ma il COI risulta 0: controlla i collegamenti genealogici o eventuali dati incoerenti.');
+ if(F===0&&!common.length&&filled>0)warnings.push('Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
  const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
 }
