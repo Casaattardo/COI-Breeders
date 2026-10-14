@@ -23,10 +23,8 @@ function updateCount(){const all=document.querySelectorAll('[data-node]');let fi
 document.addEventListener('input',e=>{if(e.target.matches('[data-node]'))updateCount()});
 function collect(side){const r={};document.querySelectorAll('[data-node^="'+side+'"]').forEach(e=>{if(e.value.trim())r[e.dataset.node]=e.value.trim()});return r}
 function canonicalKey(name){
- const n=pedigreeIdentity(name);
- const matches=state.dogs.filter(d=>pedigreeIdentity(d.name||'')===n);
- if(matches.length===1)return 'dog:'+matches[0].id;
- return 'name:'+n;
+ // Chiave coerente per ogni occorrenza, anche tra archivio e campi manuali.
+ return 'pedigree:'+pedigreeIdentity(name);
 }
 function buildRoot(root,side,depth=5){
  const raw=collect(side),nodes={};
@@ -91,7 +89,8 @@ function calculate(){
  const sireId=canonicalKey(sire),damId=canonicalKey(dam);
  const F=Math.max(0,kin(sireId,damId,nodes,memo,new Set()));
  const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]&&x!==sireId&&x!==damId);
- // Diagnostic indipendente dal calcolo ricorsivo: antenati presenti in entrambi i rami.
+ const rawS=collect('s'),rawD=collect('d');
+ const commonByName=[...new Set(Object.values(rawS).map(pedigreeIdentity).filter(Boolean))].filter(n=>Object.values(rawD).some(v=>pedigreeIdentity(v)===n));
  const commonByTree=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id]}));
  const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
@@ -100,7 +99,9 @@ function calculate(){
  const duplicateNames=state.dogs.filter((d,i)=>state.dogs.some((x,j)=>j!==i&&pedigreeIdentity(x.name||'')===pedigreeIdentity(d.name||'')));
  if(duplicateNames.length)warnings.push('Esistono omonimie nell’archivio: gli individui non identificati tramite ID sono stati confrontati per nome.');
  if(F===0&&common.length)warnings.push('Sono stati rilevati antenati comuni nei campi, ma il COI risulta 0: controlla i collegamenti genealogici o eventuali dati incoerenti.');
- if(F===0&&!common.length&&filled>0)warnings.push('Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
+ if(F===0&&!common.length&&filled>0)warnings.push(commonByName.length
+  ? 'Diagnostica: antenati comuni riconosciuti per nome ma non collegati al calcolo: '+commonByName.join(', ')+'.'
+  : 'Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
  if(F===0&&commonByTree.length)warnings.push('Diagnostica: i rami contengono antenati con la stessa identità, ma la relazione padre-madre risulta non consanguinea.');
  const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
