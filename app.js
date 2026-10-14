@@ -131,6 +131,18 @@ renderPedigreeInputs();populateBreederSelectors();renderArchive();if(state.curre
 if('serviceWorker'in navigator)navigator.serviceWorker.register('sw.js').catch(()=>{});window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();const b=document.getElementById('install');if(b){b.classList.remove('hidden');b.onclick=()=>e.prompt()}});
 let aiImageData='',aiExtracted={};
 function previewPedigree(e){const f=e.target.files?.[0];if(!f)return;const rd=new FileReader();rd.onload=()=>{aiImageData=rd.result;document.getElementById('pedImage').src=aiImageData;document.getElementById('aiStatus').textContent='Foto caricata. Premi “AI Analizza” per avviare l’estrazione.'};rd.readAsDataURL(f)}
+function aiSideIsDam(side){return /^(dam|mother|female|madre|materno|maternal)$/i.test(String(side||''));}
+function aiPedigreeMap(x,treeSide='s'){
+ const map={};
+ (x.ancestors||[]).forEach(v=>{
+  const gen=Number(v.generation),pos=Number(v.position)-1;
+  if(!v.name||!Number.isInteger(gen)||gen<1||gen>5||!Number.isInteger(pos)||pos<0)return;
+  const level=gen-1, offset=aiSideIsDam(v.side)?2**level:0, index=offset+pos;
+  if(index<2**(level+1))map[treeSide+level+'_'+index]=String(v.name).trim();
+ });
+ [x.parents?.sire,x.parents?.dam].forEach((name,i)=>{const key=treeSide+'0_'+i;if(name&&!map[key])map[key]=String(name).trim()});
+ return map;
+}
 function applyAIResult(){
  const x=window.aiExtracted;
  if(!x||!x.subject||!Array.isArray(x.ancestors)){alert('Non ci sono dati AI verificati da applicare.');return}
@@ -138,21 +150,17 @@ function applyAIResult(){
  showView('new');
  const rootInput=document.getElementById(side==='sire'?'sireName':'damName');if(rootInput)rootInput.value=(x.subject.name||'').trim();
  document.querySelectorAll('[data-node^="'+treeSide+'"]').forEach(el=>el.value='');
- const vals=new Map();
- (x.ancestors||[]).forEach(v=>{const gen=Number(v.generation),pos=Number(v.position)-1;if(!v.name||!Number.isInteger(gen)||gen<1||gen>5||!Number.isInteger(pos)||pos<0)return;const level=gen-1,index=(v.side==='dam'?2**level:0)+pos;if(index<2**(level+1))vals.set(treeSide+level+'_'+index,String(v.name).trim())});
- [x.parents?.sire,x.parents?.dam].forEach((name,i)=>{const key=treeSide+'0_'+i;if(name&&!vals.has(key))vals.set(key,String(name).trim())});
- vals.forEach((name,key)=>{const el=document.querySelector('[data-node="'+key+'"]');if(el)el.value=name});
+ const map=aiPedigreeMap(x,treeSide);
+ Object.entries(map).forEach(([key,name])=>{const el=document.querySelector('[data-node="'+key+'"]');if(el)el.value=name});
  updateCount();window.aiPedigreeConfirmed=true;
- const note=document.getElementById('aiStatus');if(note)note.textContent='✓ Pedigree applicato al ramo '+(side==='sire'?'paterno':'materno')+'. Verifica gli antenati e poi calcola il COI.';
+ const note=document.getElementById('aiStatus');if(note)note.textContent='✓ Pedigree applicato al ramo '+(side==='sire'?'paterno':'materno')+'. Antenati trasferiti: '+Object.keys(map).length+'. Verifica i dati e poi calcola il COI.';
 }
 function applyArchivePedigree(x){
- const map={};
- (x.ancestors||[]).forEach(v=>{const gen=Number(v.generation),pos=Number(v.position)-1;if(!v.name||!Number.isInteger(gen)||gen<1||gen>5||!Number.isInteger(pos)||pos<0)return;const level=gen-1,index=(v.side==='dam'?2**level:0)+pos;if(index<2**(level+1))map['s'+level+'_'+index]=String(v.name).trim()});
- [x.parents?.sire,x.parents?.dam].forEach((name,i)=>{const key='s0_'+i;if(name&&!map[key])map[key]=String(name).trim()});
+ const map=aiPedigreeMap(x,'s');
  state.pendingDogPedigree=map;
  document.getElementById('dogName').value=x.subject?.name||document.getElementById('dogName').value;
  document.getElementById('dogBreed').value=x.subject?.breed||document.getElementById('dogBreed').value;
  const sex=(x.subject?.sex||'').toUpperCase();if(sex.startsWith('M'))document.getElementById('dogSex').value='M';else if(sex.startsWith('F'))document.getElementById('dogSex').value='F';
- if(/^\d{4}-\d{2}-\d{2}$/.test(x.subject?.dob||''))document.getElementById('dogDob').value=x.subject.dob;
- const target=document.getElementById('dogAiStatus');if(target)target.innerHTML='<div class="check ok">Pedigree importato: '+Object.values(map).filter(Boolean).length+' antenati. Premi “Salva cane” per conservarlo nell’archivio.</div>';
+ if(/^\\d{4}-\\d{2}-\\d{2}$/.test(x.subject?.dob||''))document.getElementById('dogDob').value=x.subject.dob;
+ const target=document.getElementById('dogAiStatus');if(target)target.innerHTML='<div class="check ok">Pedigree importato: '+Object.values(map).filter(Boolean).length+' antenati. I dati sono pronti per essere salvati con “Salva cane”.</div>';
 }
