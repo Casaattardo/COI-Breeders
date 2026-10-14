@@ -2,12 +2,13 @@ const KEY='coi-breeders-v2';
 let state=JSON.parse(localStorage.getItem(KEY)||'null')||{dogs:[],litters:[],current:null};
 const save=()=>localStorage.setItem(KEY,JSON.stringify(state));
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const norm=s=>s.toLowerCase().normalize('NFD').replace(/[\\u0300-\\u036f]/g,'').replace(/\\s+/g,' ').trim();
-// Normalizza punteggiatura e numeri di registro riconoscibili, senza unire nomi solo simili.
+const norm=s=>String(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\s+/g,' ').trim();
+// Normalizza punteggiatura e prefissi dei numeri di registro senza unire nomi soltanto simili.
 const pedigreeIdentity=s=>norm(String(s||''))
- .replace(/\\b(?:l|ro1|roi|loi)\\s*\\d[\\d/.-]*\\b/g,' ')
- .replace(/[.,;:()[\\]{}]/g,' ')
- .replace(/\\s+/g,' ').trim();
+ .replace(/\b(?:l|ro1|roi|loi)\s*\d[\d/.-]*\b/gi,' ')
+ .replace(/[.,;:()[\]{}]/g,' ')
+ .replace(/\s+/g,' ').trim();
+
 function showView(id){document.querySelectorAll('.view').forEach(x=>x.classList.remove('active'));document.getElementById(id).classList.add('active');if(id==='new')renderPedigreeInputs();if(id==='archive')renderArchive();window.scrollTo(0,0)}
 function renderPedigreeInputs(){
  const levels=['Padri','Nonni','Bisnonni','Trisnonni','Quadrisnonni'];
