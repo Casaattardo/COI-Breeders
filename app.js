@@ -164,3 +164,13 @@ function applyArchivePedigree(x){
  if(/^\\d{4}-\\d{2}-\\d{2}$/.test(x.subject?.dob||''))document.getElementById('dogDob').value=x.subject.dob;
  const target=document.getElementById('dogAiStatus');if(target)target.innerHTML='<div class="check ok">Pedigree importato: '+Object.values(map).filter(Boolean).length+' antenati. I dati sono pronti per essere salvati con “Salva cane”.</div>';
 }
+
+function saveAIAsDog(){
+ const x=window.aiExtracted;
+ if(!x||!x.subject){alert('Conferma prima i dati del pedigree.');return}
+ openDogForm();
+ applyArchivePedigree(x);
+ showView('dog');
+ const target=document.getElementById('dogAiStatus');
+ if(target)target.innerHTML='<div class="check ok">Pedigree trasferito nella scheda del cane. Controlla i dati e premi “Salva cane” per conservarlo nell’archivio.</div>';
+}
