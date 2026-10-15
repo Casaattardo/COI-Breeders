@@ -114,9 +114,36 @@ function renderResult(r,filled){
  const checks=document.getElementById('checks');if(checks)checks.innerHTML='<div class="check '+(r.complete?'ok':'warn')+'">'+(r.complete?'✓ Pedigree completo.':'⚠ Pedigree incompleto: '+(124-filled)+' posizioni vuote.')+'</div><div class="check ok">✓ Identità archiviate tramite ID quando disponibili; gli omonimi non vengono automaticamente unificati.</div><div class="check ok">✓ COI calcolato dalla relazione genealogica padre–madre con ricorsione sui genitori.</div>';
  const d=document.getElementById('calculationDetails');if(d)d.innerHTML=r.common.map(a=>'<div class="formula">'+esc(a.name)+': n₁='+a.n1+', n₂='+a.n2+', Fₐ='+(a.fa*100).toFixed(3)+'%</div>').join('')||'<div class="empty">Nessun contributo da antenati comuni.</div>';
 }
+function renderDogTree(pedigree={},subjectName=''){
+ const host=document.getElementById('dogTreeVisual');if(!host)return;
+ const depth=5,rowH=46,totalRows=2**depth,height=totalRows*rowH+30,colW=210,gap=18,width=6*colW+5*gap;
+ const escSvg=s=>esc(String(s||''));
+ let lines='',nodes='';
+ for(let g=0;g<=depth;g++){
+  const count=2**g;
+  for(let i=0;i<count;i++){
+   const y=((i+0.5)*(totalRows/count))*rowH+15;
+   const x=g*(colW+gap);
+   let name='';
+   if(g===0)name=subjectName||'Soggetto';
+   else name=pedigree['s'+(g-1)+'_'+i]||'—';
+   if(g<depth){
+    const childX=(g+1)*(colW+gap);
+    const childCount=2**(g+1);
+    const y1=((i*2+0.5)*(totalRows/childCount))*rowH+15;
+    const y2=((i*2+1+0.5)*(totalRows/childCount))*rowH+15;
+    lines+=`<path d="M ${x+colW} ${y} H ${x+colW+gap/2} V ${y1} H ${childX}"/><path d="M ${x+colW+gap/2} ${y} V ${y2} H ${childX}"/>`;
+   }
+   nodes+=`<div class="dog-tree-node ${g===0?'root':''} ${name==='—'?'missing':''}" style="left:${x}px;top:${y-17}px;width:${colW-8}px" title="${escSvg(name)}"><span>${escSvg(name)}</span></div>`;
+  }
+ }
+ const labels=['Soggetto','Gen. 1 · Genitori','Gen. 2 · Nonni','Gen. 3 · Bisnonni','Gen. 4 · Trisnonni','Gen. 5 · Quadrisnonni'];
+ host.innerHTML='<div class="dog-tree-scroll"><div class="dog-tree-canvas" style="width:'+width+'px;height:'+height+'px"><div class="dog-tree-labels">'+labels.map((l,i)=>'<span style="left:'+(i*(colW+gap))+'px;width:'+(colW-8)+'px">'+l+'</span>').join('')+'</div><svg class="dog-tree-lines" width="'+width+'" height="'+height+'" viewBox="0 0 '+width+' '+height+'" aria-hidden="true">'+lines+'</svg>'+nodes+'</div></div>';
+}
 function renderDogPedigreeInputs(pedigree={}){const host=document.getElementById('dogPedigreeEditor');if(!host)return;const levels=['Padri','Nonni','Bisnonni','Trisnonni','Quadrisnonni'];let h='';levels.forEach((label,g)=>{h+='<div class="gen-title">'+label+' — generazione '+(g+1)+'</div><div class="two">';for(let i=0;i<2**(g+1);i++){const key='s'+g+'_'+i;h+='<label>'+((g===0)?(i===0?'Padre':'Madre'):'Antenato '+(i+1))+'<input data-dog-node="'+key+'" value="'+esc(pedigree[key]||'')+'" placeholder="Nome antenato"></label>';}h+='</div>';});host.innerHTML=h;}
 function collectDogPedigree(){const map={};document.querySelectorAll('[data-dog-node]').forEach(el=>{if(el.value.trim())map[el.dataset.dogNode]=el.value.trim()});return map;}
-function openDogForm(id=''){state.editDogId=id;state.pendingDogPedigree=null;const d=state.dogs.find(x=>x.id===id)||{};document.getElementById('dogTitle').textContent=id?'Modifica cane':'Nuovo cane';document.getElementById('dogName').value=d.name||'';document.getElementById('dogSex').value=d.sex||'';document.getElementById('dogBreed').value=d.breed||'';document.getElementById('dogAffix').value=d.affix||'';document.getElementById('dogDob').value=d.dob||'';document.getElementById('dogLoi').value=d.loi||'';document.getElementById('dogChip').value=d.chip||'';document.getElementById('dogColor').value=d.color||'';document.getElementById('dogNotes').value=d.notes||'';state.pendingDogPedigree=d.pedigree||{};fillParentSelects(d.sireId,d.damId);showView('dog');renderDogPedigreeInputs(state.pendingDogPedigree)}
+document.addEventListener('input',e=>{if(e.target.matches('[data-dog-node]'))renderDogTree(collectDogPedigree(),document.getElementById('dogName').value);if(e.target.id==='dogName')renderDogTree(collectDogPedigree(),e.target.value)});
+function openDogForm(id=''){state.editDogId=id;state.pendingDogPedigree=null;const d=state.dogs.find(x=>x.id===id)||{};document.getElementById('dogTitle').textContent=id?'Modifica cane':'Nuovo cane';document.getElementById('dogName').value=d.name||'';document.getElementById('dogSex').value=d.sex||'';document.getElementById('dogBreed').value=d.breed||'';document.getElementById('dogAffix').value=d.affix||'';document.getElementById('dogDob').value=d.dob||'';document.getElementById('dogLoi').value=d.loi||'';document.getElementById('dogChip').value=d.chip||'';document.getElementById('dogColor').value=d.color||'';document.getElementById('dogNotes').value=d.notes||'';state.pendingDogPedigree=d.pedigree||{};fillParentSelects(d.sireId,d.damId);showView('dog');renderDogPedigreeInputs(state.pendingDogPedigree);renderDogTree(state.pendingDogPedigree,document.getElementById('dogName').value)}
 function fillParentSelects(sireId='',damId=''){for(const id of ['dogSire','dogDam']){const el=document.getElementById(id);el.innerHTML='<option value="">— Non specificato —</option>'+state.dogs.filter(d=>d.id!==state.editDogId).map(d=>'<option value="'+d.id+'">'+esc(d.name)+'</option>').join('')}document.getElementById('dogSire').value=sireId||'';document.getElementById('dogDam').value=damId||''}
 function saveDog(){const name=document.getElementById('dogName').value.trim();if(!name){alert('Inserisci il nome del cane.');return}const data={name,sex:document.getElementById('dogSex').value,breed:document.getElementById('dogBreed').value.trim(),affix:document.getElementById('dogAffix').value.trim(),dob:document.getElementById('dogDob').value,loi:document.getElementById('dogLoi').value.trim(),chip:document.getElementById('dogChip').value.trim(),color:document.getElementById('dogColor').value.trim(),notes:document.getElementById('dogNotes').value.trim(),sireId:document.getElementById('dogSire').value,damId:document.getElementById('dogDam').value,pedigree:collectDogPedigree()};if(state.editDogId){const i=state.dogs.findIndex(d=>d.id===state.editDogId);state.dogs[i]={...state.dogs[i],...data}}else state.dogs.push({id:crypto.randomUUID(),...data});save();showView('archive')}
 function deleteCurrentDog(){if(!state.editDogId)return;if(!confirm('Eliminare questo cane dall’archivio?'))return;state.dogs=state.dogs.filter(d=>d.id!==state.editDogId);state.dogs.forEach(d=>{if(d.sireId===state.editDogId)d.sireId='';if(d.damId===state.editDogId)d.damId=''});save();showView('archive')}
