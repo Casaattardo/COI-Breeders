@@ -61,11 +61,17 @@ function merge(a,b){
  for(const [id,n] of Object.entries(a))o[id]={...n};
  for(const [id,n] of Object.entries(b)){
   if(!o[id]){o[id]={...n};continue}
-  const old=o[id],sireConflict=!!(old.sire&&n.sire&&old.sire!==n.sire),damConflict=!!(old.dam&&n.dam&&old.dam!==n.dam);
+  const old=o[id];
+  const sireConflict=!!(old.sire&&n.sire&&old.sire!==n.sire);
+  const damConflict=!!(old.dam&&n.dam&&old.dam!==n.dam);
   if(sireConflict||damConflict)conflicts.push({id,name:old.name||n.name,sireA:old.sire,sireB:n.sire,damA:old.dam,damB:n.dam});
-  // Non sovrascrivere in silenzio genitori discordanti: conserva i dati disponibili
-  // ma la UI segnalerà che il COI non è certificabile finché il conflitto non è risolto.
-  o[id]={...old,name:old.name||n.name,sire:sireConflict?old.sire:(old.sire||n.sire),dam:damConflict?old.dam:(old.dam||n.dam),gen:Math.min(old.gen??99,n.gen??99),sources:[...(old.sources||[old.source]),n.source]};
+  // Preserve each non-conflicting parent link independently. A conflict on one
+  // parent must not discard the other valid parent path.
+  o[id]={...old,name:old.name||n.name,
+   sire:sireConflict?old.sire:(old.sire||n.sire),
+   dam:damConflict?old.dam:(old.dam||n.dam),
+   gen:Math.min(old.gen??99,n.gen??99),
+   sources:[...(old.sources||[old.source]),n.source]};
  }
  return {nodes:o,conflicts};
 }
@@ -86,12 +92,12 @@ function calculate(){
  if(!sire||!dam){alert('Inserisci il nome del padre e della madre.');return}
  const A=buildRoot(sire,'s'),B=buildRoot(dam,'d'),merged=merge(A,B),nodes=merged.nodes,memo={};
  const sireId=canonicalKey(sire),damId=canonicalKey(dam);
- const F=Math.max(0,kin(sireId,damId,nodes,memo,new Set()));
+ const F=Math.max(0,window.COIEngine.offspringInbreeding(sireId,damId,nodes));
  const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]&&x!==sireId&&x!==damId);
  const rawS=collect('s'),rawD=collect('d');
  const commonByName=[...new Set(Object.values(rawS).map(pedigreeIdentity).filter(Boolean))].filter(n=>Object.values(rawD).some(v=>pedigreeIdentity(v)===n));
  const commonByTree=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id]}));
- const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
+ const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo)),contribution:Math.pow(0.5,sa[id]+da[id]+1)*(1+Math.max(0,inbreed(id,nodes,memo)))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
  const warnings=[];
  if(merged.conflicts.length)warnings.push('ATTENZIONE: '+merged.conflicts.length+' antenati hanno genitori discordanti tra i due pedigree. Il COI è provvisorio e non va considerato affidabile finché i conflitti non vengono corretti.');
@@ -111,7 +117,7 @@ function renderResult(r,filled){
  if(r.warnings?.length)document.getElementById('coiNote').textContent+=' '+r.warnings.join(' ');
  document.getElementById('ancestors').innerHTML=r.common.length?r.common.map(a=>'<div class="ancestor"><b>'+esc(a.name)+'</b><span>G'+a.n1+' / G'+a.n2+'</span></div>').join(''):'<div class="empty">Nessun antenato comune rilevato.</div>';
  const checks=document.getElementById('checks');if(checks)checks.innerHTML='<div class="check '+(r.complete?'ok':'warn')+'">'+(r.complete?'✓ Pedigree completo.':'⚠ Pedigree incompleto: '+(124-filled)+' posizioni vuote.')+'</div><div class="check ok">✓ Identità archiviate tramite ID quando disponibili; gli omonimi non vengono automaticamente unificati.</div><div class="check ok">✓ COI calcolato dalla relazione genealogica padre–madre con ricorsione sui genitori.</div>';
- const d=document.getElementById('calculationDetails');if(d)d.innerHTML=r.common.map(a=>'<div class="formula">'+esc(a.name)+': n₁='+a.n1+', n₂='+a.n2+', Fₐ='+(a.fa*100).toFixed(3)+'%</div>').join('')||'<div class="empty">Nessun contributo da antenati comuni.</div>';
+ const d=document.getElementById('calculationDetails');if(d)d.innerHTML=r.common.map(a=>'<div class="formula">'+esc(a.name)+': n₁='+a.n1+', n₂='+a.n2+', Fₐ='+(a.fa*100).toFixed(3)+'%, contributo teorico del percorso='+(a.contribution*100).toFixed(3)+'%</div>').join('')||'<div class="empty">Nessun contributo da antenati comuni.</div>';
 }
 function renderDogTree(pedigree={},subjectName=''){
  const host=document.getElementById('dogTreeVisual');if(!host)return;
