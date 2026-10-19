@@ -57,18 +57,17 @@ function buildRoot(root,side,depth=5){
  return nodes;
 }
 function merge(a,b){
- const o={}; const conflicts=[];
+ const o={},conflicts=[];
  for(const [id,n] of Object.entries(a))o[id]={...n};
  for(const [id,n] of Object.entries(b)){
-  if(!o[id])o[id]={...n};
-  else{
-   const old=o[id];
-   o[id]={...old,name:old.name||n.name,sire:old.sire||n.sire,dam:old.dam||n.dam,gen:Math.min(old.gen??99,n.gen??99),sources:[...(old.sources||[old.source]),n.source]};
-   if(old.sire&&n.sire&&old.sire!==n.sire)conflicts.push(id);
-   if(old.dam&&n.dam&&old.dam!==n.dam)conflicts.push(id);
-  }
+  if(!o[id]){o[id]={...n};continue}
+  const old=o[id],sireConflict=!!(old.sire&&n.sire&&old.sire!==n.sire),damConflict=!!(old.dam&&n.dam&&old.dam!==n.dam);
+  if(sireConflict||damConflict)conflicts.push({id,name:old.name||n.name,sireA:old.sire,sireB:n.sire,damA:old.dam,damB:n.dam});
+  // Non sovrascrivere in silenzio genitori discordanti: conserva i dati disponibili
+  // ma la UI segnalerà che il COI non è certificabile finché il conflitto non è risolto.
+  o[id]={...old,name:old.name||n.name,sire:sireConflict?old.sire:(old.sire||n.sire),dam:damConflict?old.dam:(old.dam||n.dam),gen:Math.min(old.gen??99,n.gen??99),sources:[...(old.sources||[old.source]),n.source]};
  }
- return {nodes:o,conflicts:[...new Set(conflicts)]};
+ return {nodes:o,conflicts};
 }
 function kin(a,b,nodes,memo,stack){return window.COIEngine.kin(a,b,nodes,memo,stack)}
 function inbreed(id,nodes,memo){return window.COIEngine.ancestorInbreeding(id,nodes)}
@@ -95,7 +94,7 @@ function calculate(){
  const common=ids.map(id=>({id,name:nodes[id]?.name||id,n1:sa[id],n2:da[id],fa:Math.max(0,inbreed(id,nodes,memo))})).sort((a,b)=>a.n1+a.n2-b.n1-b.n2);
  const positions=124,filled=Object.keys(collect('s')).length+Object.keys(collect('d')).length;
  const warnings=[];
- if(merged.conflicts.length)warnings.push('Sono stati rilevati antenati con genitori discordanti tra i due pedigree: verifica i dati.');
+ if(merged.conflicts.length)warnings.push('ATTENZIONE: '+merged.conflicts.length+' antenati hanno genitori discordanti tra i due pedigree. Il COI è provvisorio e non va considerato affidabile finché i conflitti non vengono corretti.');
  const duplicateNames=state.dogs.filter((d,i)=>state.dogs.some((x,j)=>j!==i&&pedigreeIdentity(x.name||'')===pedigreeIdentity(d.name||'')));
  if(duplicateNames.length)warnings.push('Esistono omonimie nell’archivio: gli individui non identificati tramite ID sono stati confrontati per nome.');
  if(F===0&&common.length)warnings.push('Sono stati rilevati antenati comuni nei campi, ma il COI risulta 0: controlla i collegamenti genealogici o eventuali dati incoerenti.');
@@ -103,7 +102,7 @@ function calculate(){
   ? 'Diagnostica: antenati comuni riconosciuti per nome ma non collegati al calcolo: '+commonByName.join(', ')+'.'
   : 'Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
  if(F===0&&commonByTree.length)warnings.push('Diagnostica: i rami contengono antenati con la stessa identità, ma la relazione padre-madre risulta non consanguinea.');
- const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings};
+ const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings,conflicts:merged.conflicts};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
 }
 function renderResult(r,filled){
