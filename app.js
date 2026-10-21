@@ -27,7 +27,7 @@ function canonicalKey(name){
  return 'pedigree:'+pedigreeIdentity(name);
 }
 function buildRoot(root,side,depth=5){
- const raw=collect(side),nodes={};
+ const raw=collect(side),nodes={},conflicts=[];
  const rid=canonicalKey(root);
  nodes[rid]={id:rid,name:root,sire:null,dam:null,gen:0,source:side};
  // Collega ogni antenato alla coppia di genitori in base alla posizione nel pedigree.
@@ -49,12 +49,15 @@ function buildRoot(root,side,depth=5){
     const field=i%2===0?'sire':'dam';
     if(!nodes[cid][field])nodes[cid][field]=id;
     else if(nodes[cid][field]!==id){
-      // Mantieni il primo collegamento e lascia che merge segnali conflitti quando possibile.
+      const prior=nodes[cid][field];
+      conflicts.push({id:cid,name:nodes[cid].name||childVal,field,
+        existingParent:nodes[prior]?.name||prior,otherParent:nodes[id]?.name||id,
+        source:side==='s'?'pedigree del padre':'pedigree della madre'});
     }
    }
   }
  }
- return nodes;
+ return {nodes,conflicts};
 }
 function merge(a,b){
  const o={},conflicts=[];
@@ -90,7 +93,8 @@ function ancestorMap(side){
 function calculate(){
  const sire=document.getElementById('sireName').value.trim(),dam=document.getElementById('damName').value.trim();
  if(!sire||!dam){alert('Inserisci il nome del padre e della madre.');return}
- const A=buildRoot(sire,'s'),B=buildRoot(dam,'d'),merged=merge(A,B),nodes=merged.nodes,memo={};
+ const A=buildRoot(sire,'s'),B=buildRoot(dam,'d'),merged=merge(A.nodes,B.nodes),nodes=merged.nodes,memo={};
+ merged.conflicts=[...A.conflicts,...B.conflicts,...merged.conflicts];
  const sireId=canonicalKey(sire),damId=canonicalKey(dam);
  const F=Math.max(0,window.COIEngine.offspringInbreeding(sireId,damId,nodes));
  const sa=ancestorMap('s'),da=ancestorMap('d'),ids=Object.keys(sa).filter(x=>da[x]&&x!==sireId&&x!==damId);
@@ -108,7 +112,8 @@ function calculate(){
   ? 'Diagnostica: antenati comuni riconosciuti per nome ma non collegati al calcolo: '+commonByName.join(', ')+'.'
   : 'Nessun antenato comune riconosciuto: verifica che nomi e numeri di registro degli stessi cani siano coerenti nei due rami.');
  if(F===0&&commonByTree.length)warnings.push('Diagnostica: i rami contengono antenati con la stessa identità, ma la relazione padre-madre risulta non consanguinea.');
- const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings,conflicts:merged.conflicts};
+ const conflictDetails=merged.conflicts.map(c=>({name:c.name,field:c.field||'',sireA:nodes[c.sireA]?.name||c.sireA||'',sireB:nodes[c.sireB]?.name||c.sireB||'',damA:nodes[c.damA]?.name||c.damA||'',damB:nodes[c.damB]?.name||c.damB||'',existingParent:c.existingParent||'',otherParent:c.otherParent||'',source:c.source||'confronto tra i due pedigree'}));
+ const litter={id:crypto.randomUUID(),name:document.getElementById('litterName').value||'Analisi senza nome',sire,dam,coi:F,common,created:new Date().toISOString(),depth:5,complete:filled===positions,warnings,conflicts:conflictDetails};
  state.current=litter;state.litters.unshift(litter);save();renderResult(litter,filled);showView('result');
 }
 function renderResult(r,filled){
@@ -117,6 +122,13 @@ function renderResult(r,filled){
  if(r.warnings?.length)document.getElementById('coiNote').textContent+=' '+r.warnings.join(' ');
  document.getElementById('ancestors').innerHTML=r.common.length?r.common.map(a=>'<div class="ancestor"><b>'+esc(a.name)+'</b><span>G'+a.n1+' / G'+a.n2+'</span></div>').join(''):'<div class="empty">Nessun antenato comune rilevato.</div>';
  const checks=document.getElementById('checks');if(checks)checks.innerHTML='<div class="check '+(r.complete?'ok':'warn')+'">'+(r.complete?'✓ Pedigree completo.':'⚠ Pedigree incompleto: '+(124-filled)+' posizioni vuote.')+'</div><div class="check ok">✓ Identità archiviate tramite ID quando disponibili; gli omonimi non vengono automaticamente unificati.</div><div class="check ok">✓ COI calcolato dalla relazione genealogica padre–madre con ricorsione sui genitori.</div>';
+ const conflictHost=document.getElementById('conflictDetails');
+ if(conflictHost){
+  const conflicts=r.conflicts||[];
+  conflictHost.innerHTML=conflicts.length
+   ?'<div class="check warn">Il pedigree contiene '+conflicts.length+' conflitti genealogici. Il COI resta provvisorio.</div>'+conflicts.map((c,i)=>'<div class="formula"><b>Conflitto '+(i+1)+': '+esc(c.name)+'</b><br><small>Origine: '+esc(c.source||'confronto tra pedigree')+'</small><br>'+ (c.field==='sire'?'Padre':'Genitore')+': '+esc(c.existingParent||c.sireA||c.damA||'non specificato')+' ↔ '+esc(c.otherParent||c.sireB||c.damB||'non specificato')+'</div>').join('')
+   :'<div class="check ok">Nessun conflitto di genitori rilevato.</div>';
+ }
  const d=document.getElementById('calculationDetails');if(d)d.innerHTML=r.common.map(a=>'<div class="formula">'+esc(a.name)+': n₁='+a.n1+', n₂='+a.n2+', Fₐ='+(a.fa*100).toFixed(3)+'%, contributo teorico del percorso='+(a.contribution*100).toFixed(3)+'%</div>').join('')||'<div class="empty">Nessun contributo da antenati comuni.</div>';
 }
 function renderDogTree(pedigree={},subjectName=''){
